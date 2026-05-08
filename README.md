@@ -512,6 +512,24 @@ docker logs -f identity-validator
 docker exec identity-validator curl http://localhost:8000/api/v1/health
 ```
 
+### systemd Deployment
+
+Use this when you want the API to run directly on a Linux host without Docker. The service file is in [deploy/systemd/salesforce-identity-validator.service](deploy/systemd/salesforce-identity-validator.service).
+
+**Install the service**:
+```bash
+sudo cp deploy/systemd/salesforce-identity-validator.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable salesforce-identity-validator
+sudo systemctl start salesforce-identity-validator
+```
+
+**Check status and logs**:
+```bash
+sudo systemctl status salesforce-identity-validator
+sudo journalctl -u salesforce-identity-validator -f
+```
+
 ### Using Docker Compose
 
 **Start Services**:
