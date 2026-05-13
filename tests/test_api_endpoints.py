@@ -59,9 +59,9 @@ class TestValidateIdentityEndpoint:
                 data={
                     "user_id": "005xx000000xyz",
                     "first_name": "Jonathan",
-                    "last_name": "Garcia",
-                    "document": ("id_doc.pdf", BytesIO(file_content), "application/pdf")
-                }
+                    "last_name": "Garcia"
+                },
+                files={"document": ("id_doc.pdf", BytesIO(file_content), "application/pdf")}
             )
         
         assert response.status_code == 200
@@ -90,9 +90,9 @@ class TestValidateIdentityEndpoint:
                 data={
                     "user_id": "005xx000000xyz",
                     "first_name": "Jonathan",
-                    "last_name": "Garcia",
-                    "document": ("id_doc.pdf", BytesIO(file_content), "application/pdf")
-                }
+                    "last_name": "Garcia"
+                },
+                files={"document": ("id_doc.pdf", BytesIO(file_content), "application/pdf")}
             )
         
         assert response.status_code == 200
@@ -153,9 +153,9 @@ class TestValidateIdentityEndpoint:
             data={
                 "user_id": "005xx000000xyz",
                 "first_name": "Jonathan",
-                "last_name": "Garcia",
-                "document": ("document.txt", BytesIO(file_content), "text/plain")
-            }
+                "last_name": "Garcia"
+            },
+            files={"document": ("document.txt", BytesIO(file_content), "text/plain")}
         )
         
         assert response.status_code == 400
@@ -190,9 +190,9 @@ class TestValidateIdentityEndpoint:
                     data={
                         "user_id": "005xx000000xyz",
                         "first_name": "Jonathan",
-                        "last_name": "Garcia",
-                        "document": (filename, BytesIO(file_content), content_type)
-                    }
+                        "last_name": "Garcia"
+                    },
+                    files={"document": (filename, BytesIO(file_content), content_type)}
                 )
             
             assert response.status_code == 200, f"Failed for {filename}"
@@ -215,9 +215,9 @@ class TestValidateIdentityEndpoint:
                 data={
                     "user_id": "005xx000000xyz",
                     "first_name": "Jonathan",
-                    "last_name": "Garcia",
-                    "document": ("id_doc.pdf", BytesIO(file_content), "application/pdf")
-                }
+                    "last_name": "Garcia"
+                },
+                files={"document": ("id_doc.pdf", BytesIO(file_content), "application/pdf")}
             )
         
         assert response.status_code == 200

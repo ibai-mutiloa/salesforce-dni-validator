@@ -19,7 +19,8 @@ class Settings(BaseSettings):
     AZURE_ENDPOINT: str
     AZURE_API_KEY: str
     AZURE_API_VERSION: str = "2024-11-30"
-    AZURE_ANALYZER_ID: str = "prebuilt-idDocument"
+    AZURE_ANALYZER_ID: str = "prebuilt-read"
+    AZURE_REGION: str | None = None
     
     # Validation Configuration
     MIN_NAME_MATCH_SCORE: float = 85.0  # Fuzzy match score threshold (0-100)

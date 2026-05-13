@@ -1,9 +1,11 @@
 """Example validation requests for testing the API"""
 import requests
 import json
+from pathlib import Path
 
 # Configuration
-API_BASE_URL = "http://localhost:8000/api/v1"
+API_BASE_URL = "http://localhost:5003/api/v1"
+FIXTURE_PATH = Path("tests/fixtures/dni.jpg")
 
 
 def test_health_check():
@@ -24,12 +26,12 @@ def test_validation():
         "last_name": "Garcia"
     }
     
-    # Create a test file
-    with open("test_document.pdf", "wb") as f:
-        f.write(b"%PDF-1.0\n")  # Minimal PDF header
-    
-    with open("test_document.pdf", "rb") as f:
-        files = {"document": f}
+    if not FIXTURE_PATH.exists():
+        print(f"Error: Fixture not found at {FIXTURE_PATH}")
+        return
+
+    with FIXTURE_PATH.open("rb") as document_file:
+        files = {"document": (FIXTURE_PATH.name, document_file, "image/jpeg")}
         response = requests.post(f"{API_BASE_URL}/validate-identity", files=files, data=data)
         print(f"Status: {response.status_code}")
         print(f"Response: {json.dumps(response.json(), indent=2)}")

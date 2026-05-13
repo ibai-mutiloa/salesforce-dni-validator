@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: salesforce-identity-validator
     ports:
-      - "8000:8000"
+      - "5003:5003"
     environment:
       - AZURE_ENDPOINT=${AZURE_ENDPOINT}
       - AZURE_API_KEY=${AZURE_API_KEY}

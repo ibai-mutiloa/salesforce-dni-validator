@@ -17,7 +17,7 @@ from typing import Dict, Any
 class IdentityValidatorClient:
     """Simple client for Identity Validator API"""
     
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:5003"):
         self.base_url = base_url
         self.session = requests.Session()
     
@@ -221,7 +221,7 @@ def main():
         
         # Attempt with missing last_name
         response = requests.post(
-            "http://localhost:8000/api/v1/validate-identity",
+            "http://localhost:5003/api/v1/validate-identity",
             data={
                 "user_id": "005xx000000xyz",
                 "first_name": "Jonathan"
@@ -310,7 +310,7 @@ def main():
     print("▶" * 30)
     
     print("\nTo continue working with the API:")
-    print("  1. Access Swagger UI: http://localhost:8000/docs")
+    print("  1. Access Swagger UI: http://localhost:5003/docs")
     print("  2. Read README.md for detailed documentation")
     print("  3. Check app/api/endpoints.py for implementation details")
     print("  4. Run tests: pytest -v")

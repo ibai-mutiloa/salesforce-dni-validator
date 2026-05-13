@@ -2,13 +2,14 @@
 Azure Document Intelligence client for ID document extraction
 """
 import logging
-import io
+import re
 from typing import Optional
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 from azure.core.credentials import AzureKeyCredential
 from app.core.config import get_settings
 from app.models import IdDocumentInfo
+from app.utils.text_processing import extract_document_number
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,8 @@ class AzureDocumentClient:
         self.settings = get_settings()
         self.client = DocumentIntelligenceClient(
             endpoint=self.settings.AZURE_ENDPOINT,
-            credential=AzureKeyCredential(self.settings.AZURE_API_KEY)
+            credential=AzureKeyCredential(self.settings.AZURE_API_KEY),
+            api_version=self.settings.AZURE_API_VERSION
         )
     
     def extract_id_document_info(self, file_bytes: bytes, file_name: str) -> Optional[IdDocumentInfo]:
@@ -37,12 +39,9 @@ class AzureDocumentClient:
         try:
             logger.info(f"Starting document analysis for {file_name}")
             
-            # Determine content type from file extension
-            content_type = self._get_content_type(file_name)
-            
-            # Create request
+            # Create request body from the uploaded document bytes
             request = AnalyzeDocumentRequest(
-                base64_source=file_bytes
+                bytes_source=file_bytes
             )
             
             # Analyze document
@@ -87,35 +86,18 @@ class AzureDocumentClient:
             IdDocumentInfo with extracted data
         """
         try:
-            if not result.documents or len(result.documents) == 0:
-                logger.warning("No documents detected in analysis result")
+            raw_text = self._extract_raw_text(result)
+            if not raw_text:
+                logger.warning("No text content detected in analysis result")
                 return None
-            
-            document = result.documents[0]
-            
-            # Extract fields from the document
-            fields = document.fields if hasattr(document, 'fields') else {}
-            
-            # Helper function to safely get field value
-            def get_field_value(field_name: str, default=None):
-                if field_name in fields:
-                    field = fields[field_name]
-                    if hasattr(field, 'value'):
-                        return field.value
-                    elif hasattr(field, 'content'):
-                        return field.content
-                return default
-            
-            # Extract common ID document fields
-            first_name = get_field_value('FirstName', '')
-            last_name = get_field_value('LastName', '')
-            document_number = get_field_value('DocumentNumber', '') or get_field_value('DocumentId', '')
-            document_type = get_field_value('DocumentType', '')
-            date_of_birth = get_field_value('DateOfBirth', '')
-            expiration_date = get_field_value('ExpirationDate', '')
-            
-            # Get raw text content for debugging
-            raw_text = document.content if hasattr(document, 'content') else ''
+
+            # OCR/Read usually returns text paragraphs instead of structured fields.
+            # We keep the structured path as a fallback, but prefer the actual OCR text.
+            first_name, last_name = self._extract_names_from_text(raw_text)
+            document_number = extract_document_number(raw_text)
+            document_type = self._extract_document_type(raw_text)
+            date_of_birth = self._extract_date_of_birth(raw_text)
+            expiration_date = self._extract_expiration_date(raw_text)
             
             logger.info(
                 f"Extracted ID data - Name: {first_name} {last_name}, "
@@ -135,6 +117,99 @@ class AzureDocumentClient:
         except Exception as e:
             logger.error(f"Error parsing ID document result: {str(e)}")
             return None
+
+    def _extract_raw_text(self, result) -> str:
+        """Build a readable text blob from OCR/Read output."""
+        parts = []
+
+        if hasattr(result, "content") and result.content:
+            parts.append(str(result.content))
+
+        paragraphs = getattr(result, "paragraphs", None) or []
+        for paragraph in paragraphs:
+            content = getattr(paragraph, "content", None)
+            if content:
+                parts.append(str(content))
+
+        documents = getattr(result, "documents", None) or []
+        for document in documents:
+            content = getattr(document, "content", None)
+            if content:
+                parts.append(str(content))
+
+        return "\n".join(part.strip() for part in parts if part and part.strip())
+
+    def _extract_names_from_text(self, text: str) -> tuple[str, str]:
+        """Extract first and last names from OCR text for Spanish DNI-style documents."""
+        lines = [line.strip() for line in re.split(r"[\r\n]+", text) if line.strip()]
+        upper_lines = [line.upper() for line in lines]
+
+        first_name = ""
+        last_name = ""
+
+        for index, line in enumerate(upper_lines):
+            if line.startswith("NOMBRE"):
+                candidate = lines[index].split(" ", 1)
+                if len(candidate) > 1:
+                    first_name = candidate[1].strip()
+                elif index + 1 < len(lines):
+                    first_name = lines[index + 1].strip()
+            elif line.startswith("APELLIDOS"):
+                candidate = lines[index].split(" ", 1)
+                if len(candidate) > 1:
+                    last_name = candidate[1].strip()
+                elif index + 1 < len(lines):
+                    last_name = lines[index + 1].strip()
+
+        if not first_name and not last_name:
+            fallback_names = [line for line in lines if self._looks_like_name_line(line)]
+            if fallback_names:
+                if len(fallback_names) == 1:
+                    first_name = fallback_names[0]
+                else:
+                    last_name = fallback_names[0]
+                    first_name = fallback_names[1]
+
+        return first_name.strip(), last_name.strip()
+
+    def _extract_document_type(self, text: str) -> str:
+        """Infer the document type from OCR text."""
+        upper_text = text.upper()
+        if "DNI" in upper_text:
+            return "DNI"
+        if "PASAPORTE" in upper_text or "PASSPORT" in upper_text:
+            return "Passport"
+        return ""
+
+    def _extract_date_of_birth(self, text: str) -> str:
+        """Extract a likely birth date from OCR text."""
+        match = re.search(r"FECHA\s+DE\s+NACIMIENTO\s*([0-3]?\d[\s/-][0-1]?\d[\s/-]\d{2,4})", text, re.IGNORECASE)
+        if match:
+            return match.group(1).replace(" ", "/").strip()
+        return ""
+
+    def _extract_expiration_date(self, text: str) -> str:
+        """Extract a likely expiration date from OCR text."""
+        match = re.search(r"VALIDEZ\s*([0-3]?\d[\s/-][0-1]?\d[\s/-]\d{2,4})", text, re.IGNORECASE)
+        if match:
+            return match.group(1).replace(" ", "/").strip()
+        return ""
+
+    def _looks_like_name_line(self, line: str) -> bool:
+        """Heuristic to identify a name-like line from OCR output."""
+        if not line:
+            return False
+
+        if re.search(r"\d", line):
+            return False
+
+        normalized = line.upper().strip()
+        stopwords = {"ESPANA", "DOCUMENTO", "NACIONAL", "IDENTIDAD", "DNI", "NACIONALIDAD", "FECHA", "NACIMIENTO", "SEXO", "M", "F", "VALIDEZ", "NUM", "SOPORT", "BDA"}
+        if normalized in stopwords:
+            return False
+
+        words = [word for word in re.split(r"\s+", line) if word]
+        return 1 <= len(words) <= 4 and all(word.isalpha() or "-" in word for word in words)
 
 
 def get_azure_client() -> AzureDocumentClient:

@@ -1,9 +1,9 @@
 #!/bin/bash
 # Salesforce Identity Validator - API Examples
 # Run these examples against a locally running instance
-# Server should be running at http://localhost:8000
+# Server should be running at http://localhost:5003
 
-BASE_URL="http://localhost:8000"
+BASE_URL="http://localhost:5003"
 
 echo "🔍 Salesforce Identity Validator - API Examples"
 echo "================================================"
@@ -138,5 +138,5 @@ echo ""
 echo -e "${GREEN}✅ Examples complete!${NC}"
 echo ""
 echo "For more details, visit:"
-echo "- API Docs: http://localhost:8000/docs"
+echo "- API Docs: http://localhost:5003/docs"
 echo "- README: Check README.md file"

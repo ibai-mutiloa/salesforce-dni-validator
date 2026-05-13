@@ -50,6 +50,7 @@ env/
 htmlcov/
 .tox/
 .hypothesis/
+tests/fixtures/
 
 # Logs
 *.log
