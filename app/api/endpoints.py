@@ -10,6 +10,7 @@ from app.models import ValidationResponse, HealthResponse, IdDocumentInfo, Valid
 from app.services.validation_service import IdentityValidationService
 from app.core.config import get_settings
 from app.core.azure_client import get_azure_client
+from app.utils.text_processing import parse_username_email
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +144,85 @@ async def validate_identity(
         raise
     except Exception as e:
         logger.error(f"Unexpected error during validation: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during validation"
+        )
+
+
+@router.post(
+    "/validate-identity-username",
+    response_model=ValidationResponse,
+    tags=["Validation"],
+    summary="Validate Salesforce user where username (email) is provided",
+)
+async def validate_identity_username(
+    id_salesforce: str = Form(..., description="Salesforce User ID"),
+    username: str = Form(..., description="Username as email (e.g., jane.doe@domain.com)"),
+    document: UploadFile = File(..., description="Identity document file (PDF/JPG/PNG)")
+):
+    """Accepts `id_salesforce`, `username` (email) and `document` file.
+
+    Extracts first and last name from the username (part before @) and
+    proceeds with the same validation flow as `/validate-identity`.
+    """
+    try:
+        if not id_salesforce or not id_salesforce.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="id_salesforce cannot be empty"
+            )
+
+        if not username or not username.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="username cannot be empty"
+            )
+
+        # Parse username to first/last name
+        first_name, last_name = parse_username_email(username.strip())
+
+        # Validate file
+        if not document.filename:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="document filename is required"
+            )
+
+        allowed_extensions = {'.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.bmp'}
+        file_extension = '.' + document.filename.lower().split('.')[-1] if '.' in document.filename else ''
+        if file_extension not in allowed_extensions:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}"
+            )
+
+        file_bytes = await document.read()
+        if not file_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="document file is empty"
+            )
+
+        logger.info(f"Processing validation request for user {id_salesforce}, document: {document.filename}")
+
+        ocr_data = azure_client.extract_id_document_info(file_bytes, document.filename)
+
+        validation_result = validation_service.validate_identity(
+            user_id=id_salesforce,
+            salesforce_first_name=first_name,
+            salesforce_last_name=last_name,
+            ocr_data=ocr_data
+        )
+
+        logger.info(f"Validation completed for user {id_salesforce}: {validation_result.status}")
+
+        return validation_result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during validation (username flow): {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during validation"

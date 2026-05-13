@@ -62,3 +62,36 @@ def extract_document_number(text: str) -> str:
         return match.group(1)
     
     return ""
+
+
+def parse_username_email(email: str) -> tuple:
+    """Parse an email-like username and return (first_name, last_name).
+
+    Examples:
+    - ibai.mutiloa@domain.tld -> ("Ibai", "Mutiloa")
+    - j.perez@... -> ("J", "Perez")
+    - juanperez@... -> ("Juanperez", "")
+    """
+    if not email or '@' not in email:
+        return "", ""
+
+    local = email.split('@', 1)[0]
+
+    # Replace separators with a single space
+    parts = re.split(r'[._\-\s]+', local)
+    parts = [p for p in parts if p]
+
+    if len(parts) == 0:
+        return "", ""
+    if len(parts) == 1:
+        # Try to split camelcase or letters+surname heuristics
+        name = parts[0]
+        # If name contains digits, strip them
+        name = re.sub(r"\d+", "", name)
+        # Capitalize
+        return name.capitalize(), ""
+
+    # First element -> first name, last element -> last name
+    first = parts[0].capitalize()
+    last = parts[-1].capitalize()
+    return first, last
