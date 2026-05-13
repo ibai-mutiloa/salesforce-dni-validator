@@ -1,6 +1,7 @@
 # Salesforce Identity Validator
 
 A production-ready FastAPI microservice for validating Salesforce user registrations against uploaded identity documents using Azure Document Intelligence and fuzzy name matching.
+<img width="1764" height="608" alt="Gemini_Generated_Image_4fbd8g4fbd8g4fbd" src="https://github.com/user-attachments/assets/94ca7262-4094-4e05-b715-acf12addb097" />
 
 ## Overview
 
